@@ -95,6 +95,71 @@ export interface InventoryItem {
   updatedAt: string;
 }
 
+export interface PrescriptionMedication {
+  name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  instructions: string;
+}
+
+export interface Prescription {
+  id: string;
+  patientId: string;
+  dentistName: string;
+  date: string;
+  diagnosis: string;
+  medications: string; // JSON array of PrescriptionMedication
+  advice: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClinicalNote {
+  id: string;
+  patientId: string;
+  dentistName: string;
+  date: string;
+  toothNumber: string | null;
+  chiefComplaint: string;
+  clinicalFindings: string | null;
+  procedureDone: string;
+  nextVisitPlan: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Ensure new feature tables exist
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS Prescription (
+    id TEXT PRIMARY KEY,
+    patientId TEXT NOT NULL,
+    dentistName TEXT NOT NULL,
+    date TEXT NOT NULL,
+    diagnosis TEXT NOT NULL,
+    medications TEXT NOT NULL,
+    advice TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  )
+`).run();
+
+db.prepare(`
+  CREATE TABLE IF NOT EXISTS ClinicalNote (
+    id TEXT PRIMARY KEY,
+    patientId TEXT NOT NULL,
+    dentistName TEXT NOT NULL,
+    date TEXT NOT NULL,
+    toothNumber TEXT,
+    chiefComplaint TEXT NOT NULL,
+    clinicalFindings TEXT,
+    procedureDone TEXT NOT NULL,
+    nextVisitPlan TEXT,
+    createdAt TEXT NOT NULL,
+    updatedAt TEXT NOT NULL
+  )
+`).run();
+
 
 
 // Database helper functions
@@ -351,6 +416,88 @@ export const query = {
   },
   deleteInventoryItem: (id: string) => {
     return db.prepare('DELETE FROM Inventory WHERE id = ?').run(id);
+  },
+
+  // Prescriptions
+  getPrescriptions: (): (Prescription & { patientName: string; patientPhone: string; patientGender: string; patientDob: string })[] => {
+    return db.prepare(`
+      SELECT pr.*, p.fullName as patientName, p.contactNumber as patientPhone, p.gender as patientGender, p.dateOfBirth as patientDob
+      FROM Prescription pr
+      JOIN Patient p ON pr.patientId = p.id
+      ORDER BY pr.date DESC, pr.createdAt DESC
+    `).all() as (Prescription & { patientName: string; patientPhone: string; patientGender: string; patientDob: string })[];
+  },
+  getPrescriptionsByPatientId: (patientId: string): Prescription[] => {
+    return db.prepare('SELECT * FROM Prescription WHERE patientId = ? ORDER BY date DESC').all(patientId) as Prescription[];
+  },
+  getPrescriptionById: (id: string): (Prescription & { patientName: string; patientPhone: string; patientEmail: string | null; patientGender: string; patientDob: string }) | undefined => {
+    return db.prepare(`
+      SELECT pr.*, p.fullName as patientName, p.contactNumber as patientPhone, p.email as patientEmail, p.gender as patientGender, p.dateOfBirth as patientDob
+      FROM Prescription pr
+      JOIN Patient p ON pr.patientId = p.id
+      WHERE pr.id = ?
+    `).get(id) as (Prescription & { patientName: string; patientPhone: string; patientEmail: string | null; patientGender: string; patientDob: string }) | undefined;
+  },
+  createPrescription: (prescription: Omit<Prescription, 'createdAt' | 'updatedAt'>) => {
+    const now = new Date().toISOString();
+    return db.prepare(`
+      INSERT INTO Prescription (id, patientId, dentistName, date, diagnosis, medications, advice, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      prescription.id,
+      prescription.patientId,
+      prescription.dentistName,
+      prescription.date,
+      prescription.diagnosis,
+      prescription.medications,
+      prescription.advice,
+      now,
+      now
+    );
+  },
+  deletePrescription: (id: string) => {
+    return db.prepare('DELETE FROM Prescription WHERE id = ?').run(id);
+  },
+
+  // Clinical Notes & Case Sheets
+  getClinicalNotes: (patientId?: string): (ClinicalNote & { patientName: string })[] => {
+    if (patientId) {
+      return db.prepare(`
+        SELECT cn.*, p.fullName as patientName
+        FROM ClinicalNote cn
+        JOIN Patient p ON cn.patientId = p.id
+        WHERE cn.patientId = ?
+        ORDER BY cn.date DESC, cn.createdAt DESC
+      `).all(patientId) as (ClinicalNote & { patientName: string })[];
+    }
+    return db.prepare(`
+      SELECT cn.*, p.fullName as patientName
+      FROM ClinicalNote cn
+      JOIN Patient p ON cn.patientId = p.id
+      ORDER BY cn.date DESC, cn.createdAt DESC
+    `).all() as (ClinicalNote & { patientName: string })[];
+  },
+  createClinicalNote: (note: Omit<ClinicalNote, 'createdAt' | 'updatedAt'>) => {
+    const now = new Date().toISOString();
+    return db.prepare(`
+      INSERT INTO ClinicalNote (id, patientId, dentistName, date, toothNumber, chiefComplaint, clinicalFindings, procedureDone, nextVisitPlan, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      note.id,
+      note.patientId,
+      note.dentistName,
+      note.date,
+      note.toothNumber || null,
+      note.chiefComplaint,
+      note.clinicalFindings || null,
+      note.procedureDone,
+      note.nextVisitPlan || null,
+      now,
+      now
+    );
+  },
+  deleteClinicalNote: (id: string) => {
+    return db.prepare('DELETE FROM ClinicalNote WHERE id = ?').run(id);
   }
 };
 

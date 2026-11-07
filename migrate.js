@@ -20,6 +20,40 @@ try {
     )
   `).run();
 
+  // Create Prescription table
+  console.log('Creating Prescription table if it does not exist...');
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS Prescription (
+      id TEXT PRIMARY KEY,
+      patientId TEXT NOT NULL,
+      dentistName TEXT NOT NULL,
+      date TEXT NOT NULL,
+      diagnosis TEXT NOT NULL,
+      medications TEXT NOT NULL,
+      advice TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    )
+  `).run();
+
+  // Create ClinicalNote table
+  console.log('Creating ClinicalNote table if it does not exist...');
+  db.prepare(`
+    CREATE TABLE IF NOT EXISTS ClinicalNote (
+      id TEXT PRIMARY KEY,
+      patientId TEXT NOT NULL,
+      dentistName TEXT NOT NULL,
+      date TEXT NOT NULL,
+      toothNumber TEXT,
+      chiefComplaint TEXT NOT NULL,
+      clinicalFindings TEXT,
+      procedureDone TEXT NOT NULL,
+      nextVisitPlan TEXT,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
+    )
+  `).run();
+
   // 2. Check if invoiceId column exists in Expense table
   console.log('Checking Expense table schema...');
   const tableInfo = db.prepare("PRAGMA table_info(Expense)").all();
